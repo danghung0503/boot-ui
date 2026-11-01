@@ -571,6 +571,30 @@ public class BootUiEngineConfiguration {
     }
 
     /**
+     * Hotpatch (mani fork): edits an application class's local source, compiles it with this JVM's compiler, and
+     * redefines the class through this run's claim on the BootUI agent.
+     */
+    @Bean
+    @Lazy
+    @ConditionalOnMissingBean
+    io.github.jdubois.bootui.engine.hotpatch.HotpatchService bootUiHotpatchService(
+            ObjectProvider<AgentClaimOwner> owner, ObjectProvider<JavaAgentService> javaAgent) {
+        return new io.github.jdubois.bootui.engine.hotpatch.HotpatchService(
+                AgentBridgeAccess.locate(),
+                () -> {
+                    AgentClaimOwner current = owner.getIfUnique();
+                    return current == null ? null : current.claim();
+                },
+                () -> {
+                    JavaAgentService agent = javaAgent.getIfUnique();
+                    return agent == null
+                            ? io.github.jdubois.bootui.engine.hotpatch.HotpatchService.REQUIREMENT + "."
+                            : agent.sideEffectsUnavailableReason();
+                },
+                BootUiEngineConfiguration.class.getClassLoader());
+    }
+
+    /**
      * Code Paths ({@code docs/PLAN-v2.md} §5.14, M5-4a): routes the agent's {@code code-paths} fragments of this run's
      * claim into request trees and decides the sensor's adaptive exclusion. The {@link AgentClaimOwner} starts it once
      * the context refreshed; it is closed with the context.

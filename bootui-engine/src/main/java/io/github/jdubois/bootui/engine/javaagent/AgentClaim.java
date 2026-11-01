@@ -486,6 +486,24 @@ public final class AgentClaim {
         return access.startMethodProbe(granted, request);
     }
 
+    /** Redefines application classes with this claim's token, while it is armed (Hotpatch panel, mani fork). */
+    public Map<String, Object> redefineClasses(Map<String, byte[]> classes) {
+        Long granted = token;
+        if (granted == null || ended.get()) {
+            return answer(STALE, "this run's claim on the BootUI agent ended");
+        }
+        return access.redefineClasses(granted, classes);
+    }
+
+    /** Restores application classes to their class files with this claim's token (Hotpatch panel, mani fork). */
+    public Map<String, Object> restoreClasses(List<String> classNames) {
+        Long granted = token;
+        if (granted == null || ended.get()) {
+            return answer(STALE, "this run's claim on the BootUI agent ended");
+        }
+        return access.restoreClasses(granted, classNames);
+    }
+
     /** Stops the method probe {@code id} with this claim's token. */
     public Map<String, Object> stopMethodProbe(long id) {
         Long granted = token;

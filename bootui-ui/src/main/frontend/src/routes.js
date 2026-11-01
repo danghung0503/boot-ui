@@ -53,6 +53,7 @@ const Copilot = () => import('./views/Copilot.vue')
 const McpServer = () => import('./views/McpServer.vue')
 const Cli = () => import('./views/Cli.vue')
 const JavaAgent = () => import('./views/JavaAgent.vue')
+const Hotpatch = () => import('./views/Hotpatch.vue')
 const CodeInventory = () => import('./views/CodeInventory.vue')
 const CodePaths = () => import('./views/CodePaths.vue')
 const SideEffects = () => import('./views/SideEffects.vue')
@@ -997,6 +998,30 @@ export const routes = [
         'executors',
         'propagation',
         'thread pool'
+      ]
+    }
+  },
+  {
+    // mani fork: edit a method body and redefine the class through the BootUI agent.
+    path: '/hotpatch',
+    name: 'hotpatch',
+    component: Hotpatch,
+    meta: {
+      group: groups.agent,
+      requiresAgent: true,
+      icon: 'bi-bandaid',
+      title: 'Hotpatch',
+      shortcut: 'hf',
+      keywords: [
+        'hotpatch',
+        'hot swap',
+        'hotswap',
+        'redefine',
+        'patch',
+        'edit code',
+        'method body',
+        'live fix',
+        'agent'
       ]
     }
   },

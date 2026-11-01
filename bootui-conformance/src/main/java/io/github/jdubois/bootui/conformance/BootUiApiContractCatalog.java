@@ -380,6 +380,16 @@ public final class BootUiApiContractCatalog {
                             "routes", JsonType.ARRAY,
                             "excludedMethods", JsonType.ARRAY,
                             "limitations", JsonType.ARRAY)),
+            // mani fork: the Hotpatch panel (Spring only; not applicable on Quarkus).
+            read(
+                    "hotpatch",
+                    "/hotpatch",
+                    fields(
+                            "available", JsonType.BOOLEAN,
+                            "unavailableReason", JsonType.NULLABLE_STRING,
+                            "annotationProcessor", JsonType.NULLABLE_STRING,
+                            "packages", JsonType.ARRAY,
+                            "patches", JsonType.ARRAY)),
             read(
                     "side-effects",
                     "/side-effects",
@@ -887,6 +897,9 @@ public final class BootUiApiContractCatalog {
         all(actions, "code-paths.probe.stop", "code-paths", "POST", "/code-paths/probes/0/stop");
         all(actions, "code-paths.probe.delete", "code-paths", "DELETE", "/code-paths/probes/0");
         all(actions, "java-agent.sensor.switch", "java-agent", "POST", "/java-agent/sensors/environment");
+        spring(actions, "hotpatch.compile", "hotpatch", "POST", "/hotpatch/compile");
+        spring(actions, "hotpatch.apply", "hotpatch", "POST", "/hotpatch/patches");
+        spring(actions, "hotpatch.revert", "hotpatch", "DELETE", "/hotpatch/patches/conformance.Unknown");
         all(actions, "http-probe.execute", "http-probe", "POST", "/http-probe");
         all(actions, "architecture.scan", "architecture", "POST", "/architecture/scan");
         all(actions, "vulnerabilities.scan", "vulnerabilities", "POST", "/vulnerabilities/scan");
@@ -915,6 +928,8 @@ public final class BootUiApiContractCatalog {
         all(actions, "activity.clear-recording", "activity", "POST", "/activity/journal/clear");
         all(actions, "email.clear", "email", "DELETE", "/email");
         all(actions, "kafka.clear", "kafka", "DELETE", "/kafka");
+        spring(actions, "kafka.listener.pause", "kafka", "POST", "/kafka/listeners/conformance-unknown/pause");
+        spring(actions, "kafka.listener.resume", "kafka", "POST", "/kafka/listeners/conformance-unknown/resume");
         all(actions, "rabbitmq.clear", "rabbitmq", "DELETE", "/rabbitmq");
         spring(actions, "jms.clear", "jms", "DELETE", "/jms");
         all(actions, "websockets.clear", "websockets", "DELETE", "/websockets");

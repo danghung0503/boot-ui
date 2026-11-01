@@ -554,9 +554,12 @@ button/confirmation flow, so the panel behaves and looks identical on both adapt
 | `Cache`             | **Implemented** — served over `quarkus-cache` (Caffeine) under the shared id `cache`; cache names + Micrometer metrics + clear, with an empty operations list (caching annotations are build-time woven). Tiering is reported (one local Caffeine tier per cache, with the maximum size and expiry configured under `quarkus.cache.caffeine."<name>".*`), but **native hit/miss statistics are honestly unavailable**: the public `io.quarkus.cache.CaffeineCache` interface exposes only `keySet`/`getIfPresent`/`put`/`setExpireAfter*`/`setMaximumSize` and no statistics accessor, and reaching into the internal `CaffeineCacheImpl` would violate R2. The panel states that reason and points at Micrometer cache metrics instead. |
 | `Security` advisor  | **Implemented** — a Quarkus-native ruleset (Elytron/OIDC, `quarkus.http.auth.permission.*`, TLS, CORS, Jakarta security annotations, `@PermissionsAllowed`, and `@AuthorizationPolicy`) under the same panel id `security`, replacing the Spring-Security-coupled checks. See [QUARKUS-CHECKS.md](QUARKUS-CHECKS.md) |
 
-### 5.5 Dropped on Quarkus (9)
+### 5.5 Dropped on Quarkus (10)
 
 No equivalent, low value, or superseded by Quarkus's own tooling:
+
+- **Superseded by live reload (mani fork):** `Hotpatch` — Quarkus dev mode already recompiles and reloads changed
+  classes, so the method-body hotpatch panel is not used here.
 
 - **Build-time model differences:** `Conditions` (Quarkus resolves conditions at build time — no runtime report),
   `Startup Timeline` (build-time augmentation eliminates startup steps — there is no runtime per-step buffer like
@@ -584,9 +587,9 @@ No equivalent, low value, or superseded by Quarkus's own tooling:
 - `JMS` uses Spring JMS (`JmsTemplate` and `@JmsListener`) today. Quarkus users can use the implemented Kafka and RabbitMQ
   panels while a Quarkus-native JMS capture layer remains unimplemented.
 
-**Result:** 55 of the 65 panels ship on Quarkus: 28 are statically available and 27 are capability/detector-gated. The
-remaining 10 panels do not ship: 9 are intentionally not applicable (GraalVM, CRaC, Conditions, Startup Timeline, HTTP
-Sessions, Spring Data, Spring Security, Spring DevTools, Transactions), and 1 (`JMS`) is not yet available. By portability
+**Result:** 55 of the 66 panels ship on Quarkus: 28 are statically available and 27 are capability/detector-gated. The
+remaining 11 panels do not ship: 10 are intentionally not applicable (GraalVM, CRaC, Conditions, Startup Timeline, HTTP
+Sessions, Spring Data, Spring Security, Spring DevTools, Transactions, Hotpatch), and 1 (`JMS`) is not yet available. By portability
 strategy, the 55 supported entries comprise 26 ported as-is, 13 source-swapped, 13 capture-rebuilt, and 3 replaced with a
 Quarkus-native panel. The Scorecard panel is available (its scoring dashboard renders client-side from the
 advisor endpoints, and the shell-chrome `GET /bootui/api/overview` endpoint is served on both adapters).
@@ -846,6 +849,7 @@ Pentesting, HTTP Probe, MCP Server) need no special ingredients — they work ag
 | Security            | **done**    | Replace | Quarkus security ruleset         | Quarkus-native checks (OIDC/auth/TLS/CORS/annotations); see QUARKUS-CHECKS.md |
 | GraalVM             | **done**    | Drop    | —                                | Quarkus native-first; `NOT_APPLICABLE`      |
 | CRaC                | **done**    | Drop    | —                                | Spring lifecycle-specific; `NOT_APPLICABLE` |
+| Hotpatch            | spring-only | Drop    | —                                | mani fork; Quarkus live reload recompiles changed classes; `NOT_APPLICABLE` |
 | Spring DevTools     | **done**    | Drop    | —                                | Quarkus live reload built in; `NOT_APPLICABLE` |
 | Conditions          | spring-only | Drop    | —                                | no runtime conditions report                |
 | Startup Timeline    | spring-only | Drop    | —                                | not applicable: build-time augmentation, no runtime per-step buffer |

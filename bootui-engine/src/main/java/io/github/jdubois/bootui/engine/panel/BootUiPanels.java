@@ -73,6 +73,9 @@ public final class BootUiPanels {
     public static final String MCP_SERVER = "mcp-server";
     public static final String CLI = "cli";
     public static final String JAVA_AGENT = "java-agent";
+    /** The Hotpatch panel (mani fork): edits a method body and redefines the class through the agent. */
+    public static final String HOTPATCH = "hotpatch";
+
     public static final String ACTIVITY = "activity";
     public static final String RUNTIME_INSIGHTS = "runtime-insights";
     public static final String CODE_INVENTORY = "code-inventory";
@@ -151,6 +154,7 @@ public final class BootUiPanels {
             // therefore drives only the sidebar entry and its enable/read-only toggles.
             new Panel(CLI, "Command Line", false, List.of()),
             new Panel(JAVA_AGENT, "Java Agent", true, "/java-agent"),
+            new Panel(HOTPATCH, "Hotpatch", true, "/hotpatch"),
             new Panel(ACTIVITY, "Live Activity", true, "/activity"),
             new Panel(RUNTIME_INSIGHTS, "Runtime Insights", true, "/runtime-insights"),
             new Panel(CODE_INVENTORY, "Code Inventory", false, "/code-inventory"),

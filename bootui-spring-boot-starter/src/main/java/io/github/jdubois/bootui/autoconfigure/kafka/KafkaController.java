@@ -1,18 +1,25 @@
 package io.github.jdubois.bootui.autoconfigure.kafka;
 
 import io.github.jdubois.bootui.autoconfigure.BootUiProperties;
+import io.github.jdubois.bootui.core.dto.KafkaListenerDto;
+import io.github.jdubois.bootui.core.dto.KafkaListenersReport;
 import io.github.jdubois.bootui.core.dto.KafkaReport;
 import io.github.jdubois.bootui.engine.kafka.KafkaActivityRecorder;
 import io.github.jdubois.bootui.engine.kafka.KafkaMessageDtos;
+import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.http.HttpStatus;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Read/clear API for the dedicated Kafka panel.
@@ -36,14 +43,17 @@ public class KafkaController {
     private final ObjectProvider<KafkaActivityRecorder> recorderProvider;
     private final ObjectProvider<KafkaTemplate<?, ?>> kafkaTemplateProvider;
     private final BootUiProperties properties;
+    private final ObjectProvider<KafkaListenerEndpointRegistry> registryProvider;
 
     public KafkaController(
             ObjectProvider<KafkaActivityRecorder> recorderProvider,
             ObjectProvider<KafkaTemplate<?, ?>> kafkaTemplateProvider,
-            BootUiProperties properties) {
+            BootUiProperties properties,
+            ObjectProvider<KafkaListenerEndpointRegistry> registryProvider) {
         this.recorderProvider = recorderProvider;
         this.kafkaTemplateProvider = kafkaTemplateProvider;
         this.properties = properties;
+        this.registryProvider = registryProvider;
     }
 
     @GetMapping
@@ -63,6 +73,34 @@ public class KafkaController {
         if (recorder != null) {
             recorder.clear();
         }
+    }
+
+    /**
+     * The application's listener containers (mani fork). {@code POST …/listeners/{id}/pause|resume} pauses or resumes
+     * one; both are actions of this panel, refused by its read-only policy.
+     */
+    @GetMapping("/listeners")
+    public KafkaListenersReport listeners() {
+        KafkaListenerContainers containers = listenerContainers();
+        return containers == null
+                ? new KafkaListenersReport(
+                        false, "No Spring Kafka listener registry (@EnableKafka) is present", List.of())
+                : new KafkaListenersReport(true, null, containers.list());
+    }
+
+    @PostMapping("/listeners/{id}/{action:pause|resume}")
+    public KafkaListenerDto changeListener(@PathVariable String id, @PathVariable String action) {
+        KafkaListenerContainers containers = listenerContainers();
+        KafkaListenerDto changed = containers == null ? null : containers.change(id, "pause".equals(action));
+        if (changed == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No Kafka listener " + id);
+        }
+        return changed;
+    }
+
+    private KafkaListenerContainers listenerContainers() {
+        KafkaListenerEndpointRegistry registry = registryProvider.getIfAvailable();
+        return registry == null ? null : new KafkaListenerContainers(registry);
     }
 
     private KafkaActivityRecorder availableRecorder() {

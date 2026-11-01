@@ -741,6 +741,22 @@ See [BootUI properties](../PROPERTIES.md#java-agent) for the full list.
 
 On Quarkus these are build-time properties, read when the application is built; dev mode rebuilds when they change.
 
+## Hotpatch
+
+*mani fork.* Edits an application class's **local source file** and redefines the class in the running JVM through the
+BootUI agent, without a restart. Pick a class (`GET {api}/hotpatch/classes?q=`), edit its source
+(`GET {api}/hotpatch/source?class=`), compile it with this JVM's compiler against the running class path and the
+original class's release (`POST {api}/hotpatch/compile`), and apply it (`POST {api}/hotpatch/patches` with a required
+`reason`); `DELETE {api}/hotpatch/patches/{className}` restores the class file. Lombok, a compile-only dependency, is
+found on the class path or in the local Gradle and Maven caches and used as annotation processor.
+
+Only **method bodies** can change: the JVM refuses to add or remove a method or a field, change a signature, or add a
+lambda (a new synthetic method). The agent's own transformers run on the new bytecode, so its sensors keep instrumenting
+a patched class. A patch lives in this JVM only and is lost when the application restarts: a development tool, never a
+deployment. Requires the mani build of the BootUI agent armed for this run and a JDK; refused by
+`bootui.panels.hotpatch.read-only`. Spring MVC and WebFlux only; not applicable on Quarkus, whose dev mode live reload
+already recompiles changed classes.
+
 ## Code Paths
 
 The Code Paths panel names the application methods a route spends its time in: it turns "handler 80 ms" into

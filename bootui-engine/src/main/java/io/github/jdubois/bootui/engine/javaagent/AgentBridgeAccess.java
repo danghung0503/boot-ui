@@ -40,6 +40,8 @@ public final class AgentBridgeAccess {
 
     /** Method probes' bridge class, beside the bridge ({@code docs/PLAN-v2.md} M5-8). */
     static final String METHOD_PROBES_CLASS = "io.github.jdubois.bootui.agent.bridge.MethodProbes";
+    /** The Hotpatch panel's bridge class (mani fork), beside the bridge. */
+    static final String HOTPATCHES_CLASS = "io.github.jdubois.bootui.agent.bridge.Hotpatches";
     /** The side-effect sensors' bridge class, beside the bridge ({@code docs/PLAN-v2.md} M5-5a). */
     static final String SIDE_EFFECTS_CLASS = "io.github.jdubois.bootui.agent.bridge.SideEffects";
     /** The caught-exceptions sensor's bridge class, beside the bridge ({@code docs/PLAN-v2.md} M5-6a). */
@@ -72,6 +74,7 @@ public final class AgentBridgeAccess {
     private final CodePathsHandles codePaths;
     private final ClassEvidenceHandles classEvidence;
     private final MethodProbesHandles methodProbes;
+    private final HotpatchesHandles hotpatches;
     private final SideEffectsHandles sideEffects;
     private final CaughtHandles caught;
 
@@ -134,6 +137,7 @@ public final class AgentBridgeAccess {
         this.codePaths = this.inventory == null ? null : CodePathsHandles.bind(bridge);
         this.classEvidence = this.inventory == null ? null : ClassEvidenceHandles.bind(bridge);
         this.methodProbes = this.inventory == null ? null : MethodProbesHandles.bind(bridge);
+        this.hotpatches = releaseHandle == null ? null : HotpatchesHandles.bind(bridge);
         this.sideEffects = this.inventory == null ? null : SideEffectsHandles.bind(bridge);
         this.caught = this.inventory == null ? null : CaughtHandles.bind(bridge);
     }
@@ -834,6 +838,35 @@ public final class AgentBridgeAccess {
         }
     }
 
+    /** Whether the bridge carries the Hotpatch panel's entry points ({@code Hotpatches}, mani fork). */
+    public boolean hotpatchesSupported() {
+        return hotpatches != null;
+    }
+
+    /** Redefines {@code classes} (binary name to bytecode) for the claim {@code token} ({@code Hotpatches.redefine}). */
+    public Map<String, Object> redefineClasses(long token, Map<String, byte[]> classes) {
+        if (!hotpatchesSupported()) {
+            return unavailable(present ? "this BootUI agent predates the Hotpatch panel" : null);
+        }
+        try {
+            return copy(hotpatches.redefine.invoke(token, classes));
+        } catch (Throwable ex) {
+            return failed(ex);
+        }
+    }
+
+    /** Restores {@code classNames} to their class files for the claim {@code token} ({@code Hotpatches.restore}). */
+    public Map<String, Object> restoreClasses(long token, List<String> classNames) {
+        if (!hotpatchesSupported()) {
+            return unavailable(present ? "this BootUI agent predates the Hotpatch panel" : null);
+        }
+        try {
+            return copy(hotpatches.restore.invoke(token, classNames));
+        } catch (Throwable ex) {
+            return failed(ex);
+        }
+    }
+
     /** Every method probe the bridge keeps, as maps of JDK types: copies. Never null. */
     public List<Map<String, Object>> methodProbes() {
         if (!methodProbesSupported()) {
@@ -881,6 +914,25 @@ public final class AgentBridgeAccess {
                 return protocol instanceof Integer version && version >= 1;
             } catch (Throwable ex) {
                 return false;
+            }
+        }
+    }
+
+    /** The Hotpatch panel's bridge entry points (mani fork), bound once; {@code null} when the bridge has none. */
+    private record HotpatchesHandles(MethodHandle redefine, MethodHandle restore) {
+
+        static HotpatchesHandles bind(Class<?> bridge) {
+            try {
+                MethodHandles.Lookup lookup = MethodHandles.publicLookup();
+                Class<?> hotpatches = Class.forName(HOTPATCHES_CLASS, false, bridge.getClassLoader());
+                return new HotpatchesHandles(
+                        lookup.findStatic(
+                                hotpatches, "redefine", MethodType.methodType(Map.class, long.class, Map.class)),
+                        lookup.findStatic(
+                                hotpatches, "restore", MethodType.methodType(Map.class, long.class, List.class)));
+            } catch (Throwable ex) {
+                // An agent without the Hotpatch panel (upstream BootUI).
+                return null;
             }
         }
     }

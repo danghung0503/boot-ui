@@ -10,6 +10,7 @@ import {useAutoRefresh} from '../utils/useAutoRefresh.js'
 import {useConfirm} from '../utils/useConfirm.js'
 import {useFlashMessage} from '../utils/useFlashMessage.js'
 import FlashBanner from './components/FlashBanner.vue'
+import KafkaListeners from './components/KafkaListeners.vue'
 import PanelHeader from './components/PanelHeader.vue'
 import PanelSkeleton from './components/PanelSkeleton.vue'
 import ReadOnlyNotice from './components/ReadOnlyNotice.vue'
@@ -26,11 +27,14 @@ const directionFilter = ref('')
 const busy = ref(false)
 const lastFetched = ref(null)
 let reportVersion = 0
+// mani fork: the listeners card refreshes with the panel (refresh button and auto-refresh).
+const listenersCard = ref(null)
 
 async function fetchKafka() {
   const version = reportVersion
   error.value = null
   try {
+    listenersCard.value?.load()
     const loaded = await getJson('api/kafka')
     if (version !== reportVersion) return
     report.value = loaded
@@ -174,6 +178,13 @@ async function clearAll() {
         <ReadOnlyNotice v-if="readOnly" :reason="readOnlyReason"
           >Clearing captured Kafka activity is read-only.</ReadOnlyNotice
         >
+
+        <!-- mani fork: pause / resume @KafkaListener containers -->
+        <KafkaListeners
+          ref="listenersCard"
+          :read-only="readOnly"
+          @flash="(message, variant) => flash(message, variant)"
+        />
 
         <div v-if="!report.capturing" class="alert alert-secondary small py-2">
           Kafka capture is currently disabled (<code>bootui.kafka.enabled=false</code>); messages captured before it was

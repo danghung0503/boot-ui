@@ -55,6 +55,7 @@ covered by something else:
 | **GraalVM**, **CRaC**                | Quarkus is native-first and starts fast by design. Use its own native build.                       |
 | **Conditions**, **Startup Timeline** | Quarkus resolves wiring at build time, so there is no runtime graph or step timeline.              |
 | **Spring Security**, **Spring Data** | Quarkus uses Elytron/OIDC and Panache. Use the Quarkus Security advisor and the Hibernate advisor. |
+| **Hotpatch**                         | mani fork; Quarkus dev mode live reload already recompiles changed classes.                        |
 | **Spring DevTools**                  | Quarkus dev mode already owns live reload.                                                         |
 | **HTTP Sessions**                    | Reactive and stateless by default, as on WebFlux.                                                  |
 | **Transactions**                     | Boundary capture needs a Spring hook that Narayana and CDI do not expose.                          |

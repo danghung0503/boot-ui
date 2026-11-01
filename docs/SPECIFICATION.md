@@ -3356,6 +3356,12 @@ Initial endpoints:
 | `/bootui/api/code-paths/probes`              | POST   | Start one bounded method probe (the browser confirms first), optionally with browser-only argument/return shapes; blocked by Code Paths/global read-only policy |
 | `/bootui/api/code-paths/probes/{id}`         | GET    | One method probe; unknown ids return 404                                                |
 | `/bootui/api/code-paths/probes/{id}/stop`    | POST   | Stop a probe and remove its advice; same action policy as start                         |
+| `/bootui/api/hotpatch`                       | GET    | Hotpatch (mani fork): availability, Lombok processor found, application packages, patches in effect |
+| `/bootui/api/hotpatch/classes`               | GET    | Application classes from class directories whose name contains `q`                      |
+| `/bootui/api/hotpatch/source`                | GET    | One class's local source file and the source of its patch in effect                     |
+| `/bootui/api/hotpatch/compile`               | POST   | Compile edited source in memory; blocked by Hotpatch/global read-only policy             |
+| `/bootui/api/hotpatch/patches`               | POST   | Compile and redefine the class through the agent (the browser confirms first; `reason` required); method bodies only |
+| `/bootui/api/hotpatch/patches/{className}`   | DELETE | Restore the class files of a patch; same action policy                                   |
 | `/bootui/api/code-paths/probes/{id}`         | DELETE | Alias for stopping a method probe, not deleting its recorded evidence                   |
 | `/bootui/api/side-effects`                   | GET    | Side Effects summary: sensor coverage, frequent rows, dropped records, hooks, limitations |
 | `/bootui/api/side-effects/sensor`            | GET    | One side-effect sensor's rows, most frequent first, paged by `offset` and `limit`       |
@@ -3393,6 +3399,9 @@ Initial endpoints:
 | `/bootui/api/email`                          | DELETE | Clear captured emails when not read-only                                                |
 | `/bootui/api/kafka`                          | GET    | Bounded Kafka producer and consumer activity                                            |
 | `/bootui/api/kafka`                          | DELETE | Clear retained Kafka activity when not read-only                                        |
+| `/bootui/api/kafka/listeners`                | GET    | Spring Kafka listener containers (mani fork): group, topics, threads, partitions, paused state |
+| `/bootui/api/kafka/listeners/{id}/pause`     | POST   | Pause one listener (stops polling; records wait on the topic); Kafka read-only policy     |
+| `/bootui/api/kafka/listeners/{id}/resume`    | POST   | Resume one listener from the committed offset; same policy                              |
 | `/bootui/api/rabbitmq`                       | GET    | Bounded RabbitMQ publisher and consumer activity                                        |
 | `/bootui/api/rabbitmq`                       | DELETE | Clear retained RabbitMQ activity when not read-only                                     |
 | `/bootui/api/jms`                            | GET    | Bounded JMS producer and consumer activity                                              |
@@ -3863,6 +3872,7 @@ collapsible:
   - HTTP Probe.
 - Instrumentation:
   - Java Agent.
+  - Hotpatch.
   - Code Paths.
   - Code Inventory.
   - Side Effects.

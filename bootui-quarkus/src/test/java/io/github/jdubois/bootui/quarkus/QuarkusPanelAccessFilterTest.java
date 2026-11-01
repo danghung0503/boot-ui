@@ -304,7 +304,8 @@ class QuarkusPanelAccessFilterTest {
             BootUiPanels.GRAALVM,
             BootUiPanels.DEVTOOLS,
             BootUiPanels.CRAC,
-            BootUiPanels.TRANSACTIONS);
+            BootUiPanels.TRANSACTIONS,
+            BootUiPanels.HOTPATCH); // mani fork: Spring only
 
     /** Action-capable in the shared registry (Spring has a write path), but Quarkus has none yet. */
     private static final Set<String> NO_WRITE_PATH_ON_QUARKUS_YET = Set.of(BootUiPanels.CONFIG, BootUiPanels.JMS);

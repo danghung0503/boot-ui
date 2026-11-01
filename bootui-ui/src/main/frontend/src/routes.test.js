@@ -348,6 +348,7 @@ describe('routes', () => {
       'HTTP Exchanges',
       'HTTP Probe',
       'Java Agent',
+      'Hotpatch',
       'Code Paths',
       'Code Inventory',
       'Side Effects',
@@ -606,6 +607,7 @@ describe('routes', () => {
       groups.agent,
       groups.agent,
       groups.agent,
+      groups.agent,
       groups.developerTools,
       groups.developerTools,
       groups.developerTools,
@@ -620,11 +622,12 @@ describe('routes', () => {
     const agentRoutes = namedRoutes.filter((route) => route.meta.group === groups.agent)
     expect(agentRoutes.map((route) => route.name)).toEqual([
       'java-agent',
+      'hotpatch',
       'code-paths',
       'code-inventory',
       'side-effects'
     ])
-    expect(agentRoutes.map((route) => route.meta.requiresAgent === true)).toEqual([false, true, true, true])
+    expect(agentRoutes.map((route) => route.meta.requiresAgent === true)).toEqual([false, true, true, true, true])
     expect(namedRoutes.filter((route) => route.meta.requiresAgent).every((r) => r.meta.group === groups.agent)).toBe(
       true
     )

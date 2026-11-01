@@ -17,7 +17,7 @@ import tools.jackson.databind.json.JsonMapper;
  * enable polymorphic type metadata. Reusing such a mapper for BootUI's browser contract changes
  * ordinary JSON arrays into implementation-tagged wrappers. This converter is selected only for
  * BootUI API requests and deliberately leaves raw strings, downloads, resources, and streams to
- * Spring MVC's existing converters.</p>
+ * Spring MVC's existing converters. It reads BootUI API request bodies as well (mani fork).</p>
  */
 public final class BootUiJsonHttpMessageConverter extends JacksonJsonHttpMessageConverter {
 
@@ -28,9 +28,15 @@ public final class BootUiJsonHttpMessageConverter extends JacksonJsonHttpMessage
         this.apiPath = properties.getApiPath();
     }
 
+    /**
+     * mani fork: BootUI's own request bodies ({@code HotpatchRequest}, probe requests…) are read with this mapper too.
+     * Reading them with the application's mapper broke every BootUI action with a body in an application whose Jackson
+     * uses another naming strategy (e.g. {@code spring.jackson.property-naming-strategy=SNAKE_CASE}): {@code className}
+     * arrived as {@code null}. Requests outside the BootUI API keep the application's converters.
+     */
     @Override
     public boolean canRead(ResolvableType type, MediaType mediaType) {
-        return false;
+        return isBootUiApiRequest() && super.canRead(type, mediaType);
     }
 
     @Override

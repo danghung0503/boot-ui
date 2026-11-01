@@ -47,6 +47,8 @@ final class AgentHandler implements Function<Map<String, Object>, Map<String, Ob
     private ThreadSensor threads;
     private ApplicationMethodsSensor applicationMethods;
     private MethodProbeSensor methodProbes;
+    /** The Hotpatch panel's class redefinitions (mani fork), created on first use. */
+    private ClassRedefiner hotpatches;
     /** The current run's class loaders: the claiming and refining threads' context class loader chains, weakly. */
     private List<WeakReference<ClassLoader>> runLoaders = Collections.emptyList();
 
@@ -223,6 +225,14 @@ final class AgentHandler implements Function<Map<String, Object>, Map<String, Ob
                                 Boolean.TRUE.equals(request.get("shapes")),
                                 runLoaders));
                 return answer("ok", null);
+            case "hotpatch":
+                if (requested != generation || !armed) {
+                    return answer(AgentBridge.FAILED, "the run that asked for the hotpatch ended");
+                }
+                if (hotpatches == null) {
+                    hotpatches = new ClassRedefiner(instrumentation);
+                }
+                return hotpatches.apply(request, runLoaders);
             case "status":
                 return status();
             default:

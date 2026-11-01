@@ -419,7 +419,11 @@ public class QuarkusPanelAvailability {
                     + " TransactionExecutionListener hook, registered against ConfigurableTransactionManager beans."
                     + " Quarkus's transaction management goes through Narayana's JTA TransactionManager/Synchronization"
                     + " or the CDI @Transactional interceptor, neither of which exposes a comparable per-boundary"
-                    + " listener without far more invasive instrumentation, so this panel is not used here.");
+                    + " listener without far more invasive instrumentation, so this panel is not used here.",
+            // mani fork: the Hotpatch panel is Spring-only.
+            BootUiPanels.HOTPATCH,
+            "Not applicable on Quarkus: dev mode live reload already recompiles and reloads changed classes, so"
+                    + " this method-body hotpatch panel is not used here.");
 
     private static final Map<String, String> NOT_YET_AVAILABLE_REASONS = Map.of(
             BootUiPanels.JMS,

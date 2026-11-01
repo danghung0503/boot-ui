@@ -329,6 +329,14 @@ they already carry `OutgoingKafkaRecordMetadata`.
 
 :::
 
+### Pausing listeners (mani fork)
+
+On Spring, a **Listeners** card lists the `@KafkaListener` containers of the registry with their group, topics, threads,
+assigned partitions, and state, and pauses or resumes one after a confirmation
+(`POST {api}/kafka/listeners/{id}/pause|resume`). A paused container stops polling while its consumers keep their group
+membership and partitions, so records wait on the topic and lag grows; resuming continues from the committed offset.
+It acts on this JVM only and is refused by `bootui.panels.kafka.read-only`.
+
 ## RabbitMQ
 
 ![BootUI RabbitMQ panel](../images/bootui-rabbitmq.webp)

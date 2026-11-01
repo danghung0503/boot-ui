@@ -228,6 +228,7 @@ Enforced identically on Spring and Quarkus (`PanelAccessFilter` / `QuarkusPanelA
 | Diagnostics     | HTTP Exchanges            | `http-exchanges`            | `bootui.panels.http-exchanges.enabled`            | Not applicable; view-only.                |
 | Diagnostics     | HTTP Probe                | `http-probe`                | `bootui.panels.http-probe.enabled`                | `bootui.panels.http-probe.read-only`      |
 | Instrumentation | Java Agent                | `java-agent`                | `bootui.panels.java-agent.enabled`                | `bootui.panels.java-agent.read-only`      |
+| Instrumentation | Hotpatch                  | `hotpatch`                  | `bootui.panels.hotpatch.enabled`                  | `bootui.panels.hotpatch.read-only`        |
 | Instrumentation | Code Paths                | `code-paths`                | `bootui.panels.code-paths.enabled`                | `bootui.panels.code-paths.read-only`      |
 | Instrumentation | Code Inventory            | `code-inventory`            | `bootui.panels.code-inventory.enabled`            | Not applicable; view-only.                |
 | Instrumentation | Side Effects              | `side-effects`              | `bootui.panels.side-effects.enabled`              | Not applicable; view-only.                |

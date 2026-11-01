@@ -86,6 +86,21 @@ public class PanelsController {
         }
     }
 
+    /** Available with the mani BootUI agent armed for this run on a JDK, else with the reason (mani fork). */
+    private Availability hotpatchAvailability() {
+        try {
+            var service = applicationContext
+                    .getBeanProvider(io.github.jdubois.bootui.engine.hotpatch.HotpatchService.class)
+                    .getIfUnique();
+            String reason = service == null
+                    ? io.github.jdubois.bootui.engine.hotpatch.HotpatchService.REQUIREMENT + "."
+                    : service.unavailableReason();
+            return availability(reason == null, reason);
+        } catch (RuntimeException ex) {
+            return availability(false, io.github.jdubois.bootui.engine.hotpatch.HotpatchService.REQUIREMENT + ".");
+        }
+    }
+
     /** Available while the BootUI agent's code-paths sensor records this run, else with the agent's reason. */
     private Availability codePathsAvailability() {
         try {
@@ -167,6 +182,7 @@ public class PanelsController {
                 availability(properties.getRuntimeJournal().isEnabled(), RuntimeInsightsService.DISABLED);
             case BootUiPanels.CODE_INVENTORY -> codeInventoryAvailability();
             case BootUiPanels.CODE_PATHS -> codePathsAvailability();
+            case BootUiPanels.HOTPATCH -> hotpatchAvailability();
             case BootUiPanels.SIDE_EFFECTS -> sideEffectsAvailability();
             case BootUiPanels.MCP_SERVER -> availability(mcpServerAvailable(), mcpServerUnavailableReason());
             case BootUiPanels.JVM_TUNING ->
