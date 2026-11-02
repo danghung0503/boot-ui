@@ -743,12 +743,19 @@ On Quarkus these are build-time properties, read when the application is built; 
 
 ## Hotpatch
 
-*mani fork.* Edits an application class's **local source file** and redefines the class in the running JVM through the
-BootUI agent, without a restart. Pick a class (`GET {api}/hotpatch/classes?q=`), edit its source
-(`GET {api}/hotpatch/source?class=`), compile it with this JVM's compiler against the running class path and the
+*mani fork.* Edits an application class's source and redefines the class in the running JVM through the BootUI agent,
+without a restart. The source is the class's **local source file** when one exists (development); a deployment carries no
+source, so the class is then **decompiled from its own bytecode** with Vineflower and marked `decompiled: true` (comments lost;
+generic types come back from the class's signatures). When the application runs from a Spring Boot executable jar (`java -jar app.jar`), its
+`BOOT-INF/classes` and `BOOT-INF/lib` are extracted once to a temporary directory: that is the class list and the
+compiler's class path, since javac cannot read nested jars. Pick a class (`GET {api}/hotpatch/classes?q=`), edit its source
+(`GET {api}/hotpatch/source?class=`), compile it with javac — this JVM's on a JDK, else the JDK's `jdk.compiler` classes the application bundles on a JRE
+(compiled with `-source`/`-target`, a JRE having no `ct.sym`); only javac's bytecode keeps the synthetic members the JVM
+compares on redefinition — against the running class path and the
 original class's release (`POST {api}/hotpatch/compile`), and apply it (`POST {api}/hotpatch/patches` with a required
 `reason`); `DELETE {api}/hotpatch/patches/{className}` restores the class file. Lombok, a compile-only dependency, is
-found on the class path or in the local Gradle and Maven caches and used as annotation processor.
+found on the class path or in the local Gradle and Maven caches and used as annotation processor; decompiled source has
+Lombok already expanded and needs none.
 
 Only **method bodies** can change: the JVM refuses to add or remove a method or a field, change a signature, or add a
 lambda (a new synthetic method). The agent's own transformers run on the new bytecode, so its sensors keep instrumenting

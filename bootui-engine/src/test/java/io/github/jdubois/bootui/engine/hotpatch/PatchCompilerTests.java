@@ -24,6 +24,12 @@ class PatchCompilerTests {
     }
 
     @Test
+    void targetsTheReleaseWithSourceAndTargetWhereTheJvmHasNoCtSym() {
+        assertThat(PatchCompiler.releaseOptions(17, true)).containsExactly("--release", "17");
+        assertThat(PatchCompiler.releaseOptions(17, false)).containsExactly("-source", "17", "-target", "17");
+    }
+
+    @Test
     void reportsErrorsWithLineNumbersAndNoBytecode() {
         PatchCompiler.Compiled compiled =
                 compiler.compile("demo.Fee", "package demo;\npublic class Fee { long x() { return y; } }", 17);

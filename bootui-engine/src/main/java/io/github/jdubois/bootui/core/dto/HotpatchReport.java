@@ -8,6 +8,8 @@ import java.util.List;
  * @param available whether patches can be applied: the BootUI agent is attached with the panel's bridge and this
  *     JVM has a Java compiler
  * @param unavailableReason why not, or {@code null}
+ * @param compiler the compiler patches are built with: {@code javac <version>} on a JDK, {@code javac <version>
+ *     (bundled)} on a JRE whose application bundles {@code jdk.compiler}, or {@code null} when there is none
  * @param annotationProcessor the Lombok jar compilations use as annotation processor, or {@code null} when none was
  *     found
  * @param packages the application packages a patch may change
@@ -16,6 +18,7 @@ import java.util.List;
 public record HotpatchReport(
         boolean available,
         String unavailableReason,
+        String compiler,
         String annotationProcessor,
         List<String> packages,
         List<HotpatchDto> patches) {

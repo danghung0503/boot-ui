@@ -3358,7 +3358,7 @@ Initial endpoints:
 | `/bootui/api/code-paths/probes/{id}/stop`    | POST   | Stop a probe and remove its advice; same action policy as start                         |
 | `/bootui/api/hotpatch`                       | GET    | Hotpatch (mani fork): availability, Lombok processor found, application packages, patches in effect |
 | `/bootui/api/hotpatch/classes`               | GET    | Application classes from class directories whose name contains `q`                      |
-| `/bootui/api/hotpatch/source`                | GET    | One class's local source file and the source of its patch in effect                     |
+| `/bootui/api/hotpatch/source`                | GET    | One class's local source file (else its decompiled bytecode) and its patch in effect    |
 | `/bootui/api/hotpatch/compile`               | POST   | Compile edited source in memory; blocked by Hotpatch/global read-only policy             |
 | `/bootui/api/hotpatch/patches`               | POST   | Compile and redefine the class through the agent (the browser confirms first; `reason` required); method bodies only |
 | `/bootui/api/hotpatch/patches/{className}`   | DELETE | Restore the class files of a patch; same action policy                                   |

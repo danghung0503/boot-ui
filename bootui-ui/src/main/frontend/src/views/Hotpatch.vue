@@ -1,5 +1,5 @@
 <script setup>
-// Hotpatch (mani fork): edit an application class's local source, compile it with this JVM's compiler, and redefine
+// Hotpatch (mani fork): edit an application class's source, compile it with javac (the JDK's, or the one the application bundles on a JRE), and redefine
 // the class through the BootUI agent, method bodies only. A development tool: a patch is lost when the app restarts.
 import {getJson} from '../api.js'
 import {computed, ref, watch} from 'vue'
@@ -259,6 +259,9 @@ watch(manifestAvailable, (available) => (available ? load() : (report.value = nu
       <div v-if="loaded" class="card mb-3">
         <div class="card-header d-flex flex-wrap align-items-center gap-2">
           <span class="font-monospace">{{ loaded.className }}</span>
+          <span v-if="loaded.decompiled" class="badge text-bg-warning" title="The deployment carries no source">
+            decompiled
+          </span>
           <span class="text-muted small text-truncate">{{ loaded.path }}</span>
           <span class="ms-auto"></span>
           <div v-if="loaded.patchedSource" class="btn-group btn-group-sm" role="group">
@@ -281,9 +284,13 @@ watch(manifestAvailable, (available) => (available ? load() : (report.value = nu
           </div>
         </div>
         <div class="card-body">
+          <p v-if="loaded.decompiled" class="small text-warning-emphasis mb-2">
+            No source file in this deployment: the class was decompiled from its bytecode. Comments are lost; the line
+            numbers of stack traces follow the original class, not this text.
+          </p>
           <p class="small text-muted mb-2">
             Only method bodies can change: a new method, field, lambda, or signature is refused by the JVM. Compiled
-            with this JVM's compiler<span v-if="report.annotationProcessor"
+            with {{ report.compiler || "this JVM's compiler" }}<span v-if="report.annotationProcessor"
               >, Lombok {{ report.annotationProcessor.split('/').pop() }}</span
             >.
           </p>

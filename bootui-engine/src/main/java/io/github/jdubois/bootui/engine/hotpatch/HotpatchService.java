@@ -30,18 +30,20 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * The Hotpatch panel (mani fork): edit an application class's local source, compile it with this JVM's compiler, and
+ * The Hotpatch panel (mani fork): edit an application class's source, compile it with this JVM's compiler, and
  * redefine the class through the BootUI agent, without a restart. Only METHOD BODIES can change: the JVM refuses to add
  * or remove a method or a field or change a signature, a new lambda included. A patch lives in this JVM only and is
  * lost when the application restarts; it is a development tool, never a deployment.
  *
- * <p>Framework-neutral. The source is the class's local source file ({@link SourceLocator}), so a class compiled into an
- * archive has none. Compilation uses the running class path and the original class's release, with Lombok as annotation
- * processor when found ({@link AnnotationProcessors}).</p>
+ * <p>The source is the class's local source file ({@link SourceLocator}) when one exists (development). A deployment carries
+ * no source: the class is then decompiled from its own bytecode ({@link ClassDecompiler}), and when the application runs
+ * from a Spring Boot executable jar the compiler's class path is that jar's own classes and libraries
+ * ({@link ApplicationArchive}). Compilation uses the original class's release, with Lombok as annotation processor when
+ * found ({@link AnnotationProcessors}); decompiled source needs none.</p>
  */
 public final class HotpatchService {
 
-    public static final String REQUIREMENT = "Requires the BootUI agent and a JDK";
+    public static final String REQUIREMENT = "Requires the BootUI agent and a Java compiler";
 
     private static final Pattern CLASS_NAME = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*");
     private static final int MAX_CLASSES = 60;
@@ -51,6 +53,7 @@ public final class HotpatchService {
     private final Supplier<String> agentUnavailable;
     private final ClassLoader loader;
     private final String classPath;
+    private final Optional<ApplicationArchive> archive;
     private final Path lombok;
     /** Patches in effect, by class, oldest first, with the source they were compiled from. */
     private final Map<String, Applied> applied = new LinkedHashMap<>();
@@ -73,6 +76,7 @@ public final class HotpatchService {
         this.agentUnavailable = agentUnavailable == null ? () -> null : agentUnavailable;
         this.loader = loader;
         this.classPath = System.getProperty("java.class.path", "");
+        this.archive = ApplicationArchive.of(classPath);
         this.lombok = AnnotationProcessors.lombok(classPath, Path.of(System.getProperty("user.home", ".")))
                 .orElse(null);
     }
@@ -91,7 +95,7 @@ public final class HotpatchService {
             return REQUIREMENT + ": this application has not claimed the BootUI agent.";
         }
         if (!PatchCompiler.available()) {
-            return REQUIREMENT + ": this JVM is a JRE without a Java compiler.";
+            return REQUIREMENT + ": this JVM is a JRE and the application bundles no javac (jdk.compiler).";
         }
         return null;
     }
@@ -101,17 +105,23 @@ public final class HotpatchService {
         return new HotpatchReport(
                 reason == null,
                 reason,
+                PatchCompiler.name(),
                 lombok == null ? null : lombok.toString(),
                 packages(),
                 applied.values().stream().map(Applied::patch).toList());
     }
 
-    /** Application classes, top-level, whose name contains {@code query} (case-insensitive), from class directories. */
+    /**
+     * Application classes, top-level, whose name contains {@code query} (case-insensitive), from class directories or the
+     * executable jar's classes.
+     */
     public List<String> classes(String query) {
         String q = query == null ? "" : query.toLowerCase();
         TreeSet<String> names = new TreeSet<>();
-        for (String entry : classPath.split(File.pathSeparator)) {
-            Path root = Path.of(entry);
+        List<Path> roots = archive.isPresent()
+                ? List.of(archive.get().classes())
+                : Stream.of(classPath.split(File.pathSeparator)).map(Path::of).toList();
+        for (Path root : roots) {
             if (!Files.isDirectory(root)) {
                 continue;
             }
@@ -135,7 +145,10 @@ public final class HotpatchService {
         return names.stream().limit(MAX_CLASSES).toList();
     }
 
-    /** The local source file of {@code className}, and the source of its patch in effect. */
+    /**
+     * The source of {@code className} — its local source file, or else its bytecode decompiled — and the source of its
+     * patch in effect.
+     */
     public synchronized HotpatchSourceDto source(String className) {
         checkName(className);
         Class<?> type = type(className);
@@ -145,21 +158,62 @@ public final class HotpatchService {
         SourceLocator.Result result =
                 SourceLocator.resolve(List.of(new SourceLocator.Request(className, classFile, simple + ".java")));
         Optional<SourceLocator.Resolved> resolved = result.get(className);
-        if (resolved.isEmpty()) {
-            throw new IllegalArgumentException("No local source file for " + className
+        Applied patch = applied.get(className);
+        String patched = patch == null ? null : patch.source();
+        if (resolved.isPresent()) {
+            try {
+                Path path = resolved.get().path();
+                return new HotpatchSourceDto(
+                        className, path.toString(), Files.readString(path, StandardCharsets.UTF_8), patched, false);
+            } catch (IOException ex) {
+                throw new IllegalArgumentException("Cannot read the source of " + className + ": " + ex.getMessage());
+            }
+        }
+        Path outerClassFile = outerClassFile(outer, classFile);
+        if (outerClassFile == null) {
+            throw new IllegalArgumentException("No source file and no readable class file for " + className
                     + (result.notes().isEmpty() ? "" : ": " + String.join("; ", result.notes())));
         }
-        try {
-            Path path = resolved.get().path();
-            Applied patch = applied.get(className);
-            return new HotpatchSourceDto(
-                    className,
-                    path.toString(),
-                    Files.readString(path, StandardCharsets.UTF_8),
-                    patch == null ? null : patch.source());
-        } catch (IOException ex) {
-            throw new IllegalArgumentException("Cannot read the source of " + className + ": " + ex.getMessage());
+        String origin = archive.isPresent()
+                ? archive.get().jar() + "!/BOOT-INF/classes/" + outer.replace('.', '/') + ".class"
+                : outerClassFile.toString();
+        String decompiled = ClassDecompiler.withoutMissingTypes(
+                ClassDecompiler.decompile(outerClassFile, compileClassPath()), this::onClassPath);
+        return new HotpatchSourceDto(className, origin, decompiled, patched, true);
+    }
+
+    /** Whether {@code type}, canonical or binary ({@code a.B.C} for nested {@code a.B$C}), has a class file to load. */
+    private boolean onClassPath(String type) {
+        String path = type.replace('.', '/');
+        while (true) {
+            if (loader.getResource(path + ".class") != null) {
+                return true;
+            }
+            int slash = path.lastIndexOf('/');
+            if (slash < 0) {
+                return false;
+            }
+            path = path.substring(0, slash) + '$' + path.substring(slash + 1);
         }
+    }
+
+    /** The top-level class file on disk: in a class directory, or among the executable jar's extracted classes. */
+    private Path outerClassFile(String outer, URI classFile) {
+        if (archive.isPresent()) {
+            Path extracted = archive.get().classes().resolve(outer.replace('.', '/') + ".class");
+            return Files.isRegularFile(extracted) ? extracted : null;
+        }
+        if (classFile != null && "file".equals(classFile.getScheme())) {
+            Path path = Path.of(classFile);
+            Path top = path.resolveSibling(outer.substring(outer.lastIndexOf('.') + 1) + ".class");
+            return Files.isRegularFile(top) ? top : null;
+        }
+        return null;
+    }
+
+    /** The running class path, or the executable jar's own classes and libraries. */
+    private String compileClassPath() {
+        return archive.map(ApplicationArchive::classPath).orElse(classPath);
     }
 
     public HotpatchCompileDto compile(HotpatchRequest request) {
@@ -219,7 +273,7 @@ public final class HotpatchService {
             throw new IllegalArgumentException("A source is required.");
         }
         checkName(request.className());
-        return new PatchCompiler(classPath, lombok)
+        return new PatchCompiler(compileClassPath(), lombok)
                 .compile(request.className(), request.source(), release(request.className()));
     }
 
