@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.julien-dubois.bootui</groupId>
+        <artifactId>bootui-parent</artifactId>
+        <version>2.2.0-mani.5</version>
+    </parent>
+
+    <artifactId>bootui-hotpatch</artifactId>
+    <name>BootUI :: Hotpatch single jar (mani fork)</name>
+    <description>BootUI as ONE jar an application drops in libs/ (implementation files('libs/...')): the Spring Boot starter,
+        engine and UI, Vineflower, the BootUI agent (embedded, loaded at start-up: no -javaagent), and javac taken from the
+        JDK at javac.home, so patches compile on a JRE of the same Java version.</description>
+
+    <!--
+        Build:  JAVA_HOME=<JDK 21> ./mvnw -pl bootui-hotpatch -am clean package -DskipTests  (clean: no stale UI assets)
+        or with any JDK and -Djavac.home=<JDK 21 home>: the javac inside the jar must match the application's Java version.
+        Output: target/bootui-hotpatch-<version>.jar and target/bootui-hotpatch-<version>-lite.jar (no OTLP receiver);
+        their javac is javac.home's Java version
+    -->
+    <properties>
+        <javac.home>${java.home}</javac.home>
+        <maven.deploy.skip>false</maven.deploy.skip>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.julien-dubois.bootui</groupId>
+            <artifactId>bootui-spring-boot-starter</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.julien-dubois.bootui</groupId>
+            <artifactId>bootui-agent</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- the agent jar, unchanged, as a resource: AgentSelfAttach loads it into the JVM -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>embed-agent</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.julien-dubois.bootui</groupId>
+                                    <artifactId>bootui-agent</artifactId>
+                                    <version>${project.version}</version>
+                                    <destFileName>bootui-agent.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.outputDirectory}/META-INF/bootui</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- javac: the classes of jdk.compiler and jdk.internal.opt from the JDK at javac.home -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>bundle-javac</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <delete dir="${project.build.directory}/javac"/>
+                                <exec executable="${javac.home}/bin/jimage" failonerror="true">
+                                    <arg value="extract"/>
+                                    <arg value="--dir"/>
+                                    <arg value="${project.build.directory}/javac"/>
+                                    <arg value="--include"/>
+                                    <arg value="regex:/(jdk\.compiler|jdk\.internal\.opt)/.*"/>
+                                    <arg value="${javac.home}/lib/modules"/>
+                                </exec>
+                                <copy todir="${project.build.outputDirectory}">
+                                    <!-- English messages only: javac's ja / zh_CN / de resource bundles left out -->
+                                    <fileset dir="${project.build.directory}/javac/jdk.compiler"
+                                             excludes="module-info.class **/*_ja.class **/*_zh_CN.class **/*_de.class"/>
+                                    <fileset dir="${project.build.directory}/javac/jdk.internal.opt" excludes="module-info.class"/>
+                                </copy>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                Two jars: bootui-hotpatch-<version>.jar (every panel) and bootui-hotpatch-<version>-lite.jar, without the OTLP
+                receiver (protobuf + OpenTelemetry proto, ~2.4 MB): BootUI then registers no /bootui/api/otlp. Both relocate the
+                same packages, so the receiver's @ConditionalOnClass never sees an application's own protobuf.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <configuration>
+                    <createDependencyReducedPom>false</createDependencyReducedPom>
+                    <relocations>
+                                <relocation><pattern>com.tngtech.archunit</pattern><shadedPattern>io.github.jdubois.bootui.shaded.archunit</shadedPattern></relocation>
+                                <relocation><pattern>org.apache.commons.io</pattern><shadedPattern>io.github.jdubois.bootui.shaded.commons.io</shadedPattern></relocation>
+                                <relocation><pattern>org.apache.commons.lang3</pattern><shadedPattern>io.github.jdubois.bootui.shaded.commons.lang3</shadedPattern></relocation>
+                                <relocation><pattern>org.antlr.v4</pattern><shadedPattern>io.github.jdubois.bootui.shaded.antlr.v4</shadedPattern></relocation>
+                                <relocation><pattern>org.HdrHistogram</pattern><shadedPattern>io.github.jdubois.bootui.shaded.hdrhistogram</shadedPattern></relocation>
+                                <relocation><pattern>net.bytebuddy</pattern><shadedPattern>io.github.jdubois.bootui.shaded.bytebuddy</shadedPattern></relocation>
+                                <relocation><pattern>com.google.protobuf</pattern><shadedPattern>io.github.jdubois.bootui.shaded.protobuf</shadedPattern></relocation>
+                                <relocation><pattern>io.opentelemetry.proto</pattern><shadedPattern>io.github.jdubois.bootui.shaded.otel.proto</shadedPattern></relocation>
+                                <relocation><pattern>io.opentelemetry.semconv</pattern><shadedPattern>io.github.jdubois.bootui.shaded.otel.semconv</shadedPattern></relocation>
+                            </relocations>
+                    <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                    <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>META-INF/spring.factories</resource>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</resource>
+                                </transformer>
+                            </transformers>
+                </configuration>
+                <executions>
+                    <!-- lite first: the full execution then replaces the main jar, which lite must not read -->
+                    <execution>
+                        <id>lite</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>lite</shadedClassifierName>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.julien-dubois.bootui:bootui-spring-boot-starter</include>
+                                    <include>com.julien-dubois.bootui:bootui-engine</include>
+                                    <include>com.julien-dubois.bootui:bootui-ui</include>
+                                    <include>org.vineflower:vineflower</include>
+                                    <!-- not Spring: relocated, so the application's own copies never clash -->
+                                    <include>com.tngtech.archunit:archunit</include>
+                                    <include>commons-io:commons-io</include>
+                                    <include>org.apache.commons:commons-lang3</include>
+                                    <include>org.antlr:antlr4-runtime</include>
+                                    <include>org.hdrhistogram:HdrHistogram</include>
+                                    <include>net.bytebuddy:byte-buddy</include>
+                                </includes>
+                            </artifactSet>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>full</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.julien-dubois.bootui:bootui-spring-boot-starter</include>
+                                    <include>com.julien-dubois.bootui:bootui-engine</include>
+                                    <include>com.julien-dubois.bootui:bootui-ui</include>
+                                    <include>org.vineflower:vineflower</include>
+                                    <!-- not Spring: relocated, so the application's own copies never clash -->
+                                    <include>com.tngtech.archunit:archunit</include>
+                                    <include>commons-io:commons-io</include>
+                                    <include>org.apache.commons:commons-lang3</include>
+                                    <include>org.antlr:antlr4-runtime</include>
+                                    <include>org.hdrhistogram:HdrHistogram</include>
+                                    <include>net.bytebuddy:byte-buddy</include>
+                                    <!-- OTLP receiver only (left out of the lite jar, which then has no /bootui/api/otlp) -->
+                                    <include>com.google.protobuf:protobuf-java</include>
+                                    <include>io.opentelemetry.proto:opentelemetry-proto</include>
+                                    <include>io.opentelemetry.semconv:opentelemetry-semconv</include>
+                                </includes>
+                            </artifactSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

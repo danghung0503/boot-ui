@@ -788,6 +788,8 @@ public class BootUiReactiveAutoConfiguration {
      * Needed by {@link OtlpReceiverController}.
      */
     @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnClass(
+            name = "io.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest")
     public OtlpSpanDecoder bootUiOtlpSpanDecoder(BootUiProperties properties) {
         return new OtlpSpanDecoder(properties.getTelemetry());
     }

@@ -867,6 +867,21 @@ public final class AgentBridgeAccess {
         }
     }
 
+    /**
+     * Exports {@code packages} of {@code java.base} to {@code module} for the claim {@code token}
+     * ({@code Hotpatches.openJavaBase}): the javac an application bundles runs outside {@code jdk.compiler}.
+     */
+    public Map<String, Object> openJavaBase(long token, Module module, List<String> packages) {
+        if (!hotpatchesSupported() || hotpatches.openJavaBase == null) {
+            return unavailable(present ? "this BootUI agent cannot open java.base to a bundled javac" : null);
+        }
+        try {
+            return copy(hotpatches.openJavaBase.invoke(token, module, packages));
+        } catch (Throwable ex) {
+            return failed(ex);
+        }
+    }
+
     /** Every method probe the bridge keeps, as maps of JDK types: copies. Never null. */
     public List<Map<String, Object>> methodProbes() {
         if (!methodProbesSupported()) {
@@ -919,17 +934,27 @@ public final class AgentBridgeAccess {
     }
 
     /** The Hotpatch panel's bridge entry points (mani fork), bound once; {@code null} when the bridge has none. */
-    private record HotpatchesHandles(MethodHandle redefine, MethodHandle restore) {
+    private record HotpatchesHandles(MethodHandle redefine, MethodHandle restore, MethodHandle openJavaBase) {
 
         static HotpatchesHandles bind(Class<?> bridge) {
             try {
                 MethodHandles.Lookup lookup = MethodHandles.publicLookup();
                 Class<?> hotpatches = Class.forName(HOTPATCHES_CLASS, false, bridge.getClassLoader());
+                MethodHandle open;
+                try {
+                    open = lookup.findStatic(
+                            hotpatches,
+                            "openJavaBase",
+                            MethodType.methodType(Map.class, long.class, Object.class, List.class));
+                } catch (ReflectiveOperationException ex) {
+                    open = null; // an agent from before the single jar (2.2.0-mani.4)
+                }
                 return new HotpatchesHandles(
                         lookup.findStatic(
                                 hotpatches, "redefine", MethodType.methodType(Map.class, long.class, Map.class)),
                         lookup.findStatic(
-                                hotpatches, "restore", MethodType.methodType(Map.class, long.class, List.class)));
+                                hotpatches, "restore", MethodType.methodType(Map.class, long.class, List.class)),
+                        open);
             } catch (Throwable ex) {
                 // An agent without the Hotpatch panel (upstream BootUI).
                 return null;

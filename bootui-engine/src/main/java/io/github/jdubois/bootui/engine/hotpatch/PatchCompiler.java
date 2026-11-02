@@ -62,6 +62,24 @@ final class PatchCompiler {
         return javac != null ? javac : bundled();
     }
 
+    /** The packages {@code java.base} exports to {@code jdk.compiler} on JDK 21 and 25, which a bundled javac needs. */
+    static final List<String> JAVA_BASE_EXPORTS = List.of(
+            "sun.invoke.util",
+            "jdk.internal.javac",
+            "jdk.internal.module",
+            "jdk.internal.misc",
+            "sun.reflect.annotation",
+            "jdk.internal.jmod");
+
+    /** The module of the javac the application bundles, or {@code null} when this JVM has its own javac or none. */
+    static Module bundledModule() {
+        if (ToolProvider.getSystemJavaCompiler() != null) {
+            return null;
+        }
+        JavaCompiler bundled = bundled();
+        return bundled == null ? null : bundled.getClass().getModule();
+    }
+
     /** {@code jdk.compiler}'s classes on the application class path (unnamed module), as on a JRE. */
     static JavaCompiler bundled() {
         try {

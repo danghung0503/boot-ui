@@ -7,6 +7,7 @@ import io.github.jdubois.bootui.engine.javaagent.AgentBridgeAccess;
 import io.github.jdubois.bootui.engine.javaagent.AgentClaim;
 import io.github.jdubois.bootui.engine.javaagent.AgentPackages;
 import io.github.jdubois.bootui.engine.javaagent.AgentRequestValues;
+import io.github.jdubois.bootui.engine.javaagent.AgentSelfAttach;
 import io.github.jdubois.bootui.engine.javaagent.AgentSensorSettings;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -81,6 +82,9 @@ public class BootUiAgentClaimEnvironmentPostProcessor implements EnvironmentPost
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
         try {
             AgentBridgeAccess access = bridge.get();
+            if (!access.present() && selfAttach(environment, application)) {
+                access = bridge.get();
+            }
             if (!access.present()) {
                 return;
             }
@@ -152,6 +156,35 @@ public class BootUiAgentClaimEnvironmentPostProcessor implements EnvironmentPost
     /** Spring Cloud's bootstrap context, whose environment carries a property source named {@code bootstrap}. */
     static boolean springCloudBootstrap(ConfigurableEnvironment environment) {
         return environment.getPropertySources().contains(SPRING_CLOUD_BOOTSTRAP);
+    }
+
+    /**
+     * Loads the agent this BootUI jar carries (mani fork single jar, {@link AgentSelfAttach}) when the JVM was not started
+     * with it, BootUI is enabled for this run, and {@code bootui.agent.self-attach} is not {@code false}: an application
+     * adds BootUI as one jar, with no {@code -javaagent} flag nor agent file in its image.
+     */
+    private static boolean selfAttach(ConfigurableEnvironment environment, SpringApplication application) {
+        if (!AgentSelfAttach.available()
+                || "false"
+                        .equalsIgnoreCase(environment
+                                .getProperty("bootui.agent.self-attach", "true")
+                                .trim())
+                || !agentEnabled(environment)
+                || nestedRun()
+                || springCloudBootstrap(environment)) {
+            return false;
+        }
+        BootUiActivation activation = BootUiActivationCondition.resolve(environment, application.getClassLoader());
+        if (!activation.enabled() || AgentProfileGuard.refusal(activation, environment) != null) {
+            return false;
+        }
+        String refused = AgentSelfAttach.attach();
+        if (refused != null) {
+            LOGGER.warn("BootUI could not load its Java agent: " + refused);
+            return false;
+        }
+        LOGGER.info("BootUI loaded its Java agent into this JVM (bootui.agent.self-attach)");
+        return true;
     }
 
     private static boolean agentEnabled(ConfigurableEnvironment environment) {

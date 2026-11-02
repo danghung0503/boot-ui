@@ -757,6 +757,13 @@ original class's release (`POST {api}/hotpatch/compile`), and apply it (`POST {a
 found on the class path or in the local Gradle and Maven caches and used as annotation processor; decompiled source has
 Lombok already expanded and needs none.
 
+**Single jar (mani fork).** The `bootui-hotpatch` module builds one jar an application adds as
+`implementation files('libs/bootui-hotpatch-<version>.jar')`: the starter, engine and UI, Vineflower, the non-Spring libraries
+relocated under `io.github.jdubois.bootui.shaded`, the BootUI agent as a nested jar, and javac (`jdk.compiler`) from the JDK
+it is built with. With BootUI enabled and no `-javaagent`, start-up loads that agent through the JVM's `JVMTI.agent_load`
+diagnostic command (`bootui.agent.self-attach=false` turns it off), so a JRE without `jdk.attach` gets the agent too; the agent
+then exports the `java.base` packages the bundled javac needs to it. Guide: [mani/HOTPATCH-K8S.md](../mani/HOTPATCH-K8S.md).
+
 Only **method bodies** can change: the JVM refuses to add or remove a method or a field, change a signature, or add a
 lambda (a new synthetic method). The agent's own transformers run on the new bytecode, so its sensors keep instrumenting
 a patched class. A patch lives in this JVM only and is lost when the application restarts: a development tool, never a

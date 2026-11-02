@@ -55,6 +55,7 @@ public final class HotpatchService {
     private final String classPath;
     private final Optional<ApplicationArchive> archive;
     private final Path lombok;
+    private volatile boolean javaBaseOpened;
     /** Patches in effect, by class, oldest first, with the source they were compiled from. */
     private final Map<String, Applied> applied = new LinkedHashMap<>();
 
@@ -273,8 +274,27 @@ public final class HotpatchService {
             throw new IllegalArgumentException("A source is required.");
         }
         checkName(request.className());
+        openJavaBaseToBundledJavac();
         return new PatchCompiler(compileClassPath(), lombok)
                 .compile(request.className(), request.source(), release(request.className()));
+    }
+
+    /**
+     * A javac the application bundles (on a JRE) runs outside {@code jdk.compiler}, without the packages {@code java.base}
+     * exports to that module: the agent exports them to it, once. An application whose jar manifest already lists them as
+     * {@code Add-Exports} needs nothing more.
+     */
+    private void openJavaBaseToBundledJavac() {
+        if (javaBaseOpened) {
+            return;
+        }
+        Module javac = PatchCompiler.bundledModule();
+        AgentClaim claim = claims.get();
+        if (javac == null || claim == null) {
+            return;
+        }
+        Map<String, Object> answer = claim.openJavaBase(javac, PatchCompiler.JAVA_BASE_EXPORTS);
+        javaBaseOpened = "ok".equals(answer.get("status"));
     }
 
     private List<String> packages() {

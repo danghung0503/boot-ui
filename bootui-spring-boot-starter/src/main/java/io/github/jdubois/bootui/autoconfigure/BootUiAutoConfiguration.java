@@ -921,6 +921,8 @@ public class BootUiAutoConfiguration {
     }
 
     @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnClass(
+            name = "io.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest")
     public OtlpSpanDecoder bootUiOtlpSpanDecoder(BootUiProperties properties) {
         return new OtlpSpanDecoder(properties.getTelemetry());
     }

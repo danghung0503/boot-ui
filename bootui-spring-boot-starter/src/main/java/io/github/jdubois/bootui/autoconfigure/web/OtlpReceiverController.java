@@ -45,6 +45,9 @@ import org.springframework.web.bind.annotation.RestController;
  * callers are rejected unless {@code bootui.allow-non-localhost=true}.</p>
  */
 @RestController
+// mani fork: the single jar without OTLP (bootui-hotpatch, classifier lite) ships no protobuf / OTLP proto classes
+@org.springframework.boot.autoconfigure.condition.ConditionalOnClass(
+        name = "io.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest")
 @RequestMapping("${bootui.api-path:${bootui.path:/bootui}/api}/otlp")
 public class OtlpReceiverController {
 

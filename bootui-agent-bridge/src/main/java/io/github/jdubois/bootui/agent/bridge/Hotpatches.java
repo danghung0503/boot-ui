@@ -64,6 +64,33 @@ public final class Hotpatches {
         }
     }
 
+    /**
+     * Exports {@code packages} of {@code java.base} to {@code module}, the javac an application bundles to compile patches on
+     * a JRE: outside the JDK's {@code jdk.compiler} module it lacks the qualified exports {@code java.base} gives that
+     * module. Packages {@code java.base} does not have are skipped.
+     */
+    public static Map<String, Object> openJavaBase(long token, Object module, List<String> packages) {
+        try {
+            Claim claim = AgentBridge.current();
+            if (claim == null || claim.token != token || !claim.armed) {
+                return answer(AgentBridge.STALE, "this claim was replaced or ended");
+            }
+            if (!AgentBridge.attached()) {
+                return answer(INVALID, "the BootUI agent did not start");
+            }
+            Map<String, Object> call = new LinkedHashMap<String, Object>();
+            call.put("op", "hotpatch");
+            call.put("generation", Long.valueOf(claim.generation));
+            call.put("action", "open");
+            call.put("module", module);
+            call.put("packages", new ArrayList<String>(packages));
+            return agent(call);
+        } catch (Throwable ex) {
+            AgentBridge.error(ex);
+            return answer(AgentBridge.FAILED, "the bridge failed to open java.base: " + ex);
+        }
+    }
+
     private static String refusal(Claim claim, long token, Collection<String> names) {
         if (claim == null || claim.token != token || !claim.armed) {
             return "this claim was replaced or ended";

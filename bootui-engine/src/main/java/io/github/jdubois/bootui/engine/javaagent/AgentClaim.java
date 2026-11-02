@@ -495,6 +495,15 @@ public final class AgentClaim {
         return access.redefineClasses(granted, classes);
     }
 
+    /** Exports {@code packages} of {@code java.base} to the bundled javac's {@code module} (Hotpatch panel, mani fork). */
+    public Map<String, Object> openJavaBase(Module module, List<String> packages) {
+        Long granted = token;
+        if (granted == null || ended.get()) {
+            return answer(STALE, "this run's claim on the BootUI agent ended");
+        }
+        return access.openJavaBase(granted, module, packages);
+    }
+
     /** Restores application classes to their class files with this claim's token (Hotpatch panel, mani fork). */
     public Map<String, Object> restoreClasses(List<String> classNames) {
         Long granted = token;

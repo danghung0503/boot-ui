@@ -8,10 +8,12 @@ import java.lang.instrument.Instrumentation;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The Hotpatch panel's agent side (mani fork): redefines application classes of the current run with new bytecode, and
@@ -49,6 +51,9 @@ final class ClassRedefiner {
             if ("restore".equals(action)) {
                 return restore(names(request.get("classNames")), loaders);
             }
+            if ("open".equals(action)) {
+                return open(request.get("module"), names(request.get("packages")));
+            }
             return answer(AgentBridge.FAILED, "unknown hotpatch action " + action, null);
         } catch (Throwable ex) {
             return answer(AgentBridge.FAILED, "the JVM refused the change: " + ex, null);
@@ -70,6 +75,31 @@ final class ClassRedefiner {
         instrumentation.redefineClasses(definitions.toArray(new ClassDefinition[0]));
         originals.putAll(captured);
         return answer("ok", null, new ArrayList<String>(classes.keySet()));
+    }
+
+    /** Exports {@code packages} of {@code java.base} to {@code target} (the bundled javac's module). */
+    private Map<String, Object> open(Object target, List<String> packages) {
+        if (!(target instanceof Module)) {
+            return answer(AgentBridge.FAILED, "no module to open java.base to", null);
+        }
+        Module module = (Module) target;
+        Module base = Object.class.getModule();
+        Map<String, Set<Module>> exports = new HashMap<String, Set<Module>>();
+        for (String pkg : packages) {
+            if (base.getPackages().contains(pkg) && !base.isExported(pkg, module)) {
+                exports.put(pkg, Collections.singleton(module));
+            }
+        }
+        if (!exports.isEmpty()) {
+            instrumentation.redefineModule(
+                    base,
+                    Collections.<Module>emptySet(),
+                    exports,
+                    Collections.<String, Set<Module>>emptyMap(),
+                    Collections.<Class<?>>emptySet(),
+                    Collections.<Class<?>, List<Class<?>>>emptyMap());
+        }
+        return answer("ok", null, new ArrayList<String>(exports.keySet()));
     }
 
     private Map<String, Object> restore(List<String> names, List<WeakReference<ClassLoader>> loaders) throws Exception {
