@@ -36,13 +36,18 @@ Không gộp gì của Spring (spring-*, Boot, Jackson, Micrometer, Reactor, Net
 |---|---|
 | Spring Boot **4.x**, Spring MVC (BootUI 2.x không chạy Boot 3) | `build.gradle` |
 | App có `spring-tx` (có sẵn khi dùng JDBC / JPA / R2DBC); app không DB: thêm `implementation 'org.springframework:spring-tx'` | `./gradlew dependencies --configuration runtimeClasspath \| grep spring-tx` |
-| App chạy bằng `java -jar app.jar` (fat jar Spring Boot) | ENTRYPOINT của Dockerfile |
+| Kiểu chạy: `java -jar app.jar`, jar giải nén theo layer + `JarLauncher` (Dockerfile layered, Buildpacks), hoặc `-Djarmode=tools extract` + `java -jar app/app.jar` — **cả ba đã kiểm** | — |
 | JRE có module `java.compiler`, `java.instrument`, `jdk.management`, `jdk.zipfs` | `docker run --rm --entrypoint java <jre-image> --list-modules \| grep -E 'java.compiler\|java.instrument\|jdk.management\|jdk.zipfs'` |
 | JRE có `lib/libinstrument.so` | `docker run --rm --entrypoint sh <jre-image> -c 'ls $JAVA_HOME/lib/libinstrument.so'` |
 | JVM không chạy với `-XX:-EnableDynamicAgentLoading` | `JAVA_TOOL_OPTIONS` / ENTRYPOINT |
 | `/tmp` ghi được (agent ~5 MB + giải nén `BOOT-INF` ~ cỡ `app.jar` khi dùng Hotpatch lần đầu) | pod `readOnlyRootFilesystem` ⇒ `emptyDir` cho `/tmp` |
 
 ## 1. Build jar (một lần cho mỗi phiên bản Java)
+
+Repo BootUI là project **Maven**, nhưng chỉ cần JDK: `./mvnw` là Maven Wrapper đi kèm, tự tải Maven. Service dùng jar vẫn là
+**Gradle** — Maven chỉ dùng một lần để ra file jar. Mạng: Maven Central + nodejs.org (module UI tải Node), hoặc qua kho nội bộ —
+`~/.m2/settings.xml` với `<mirror><mirrorOf>central</mirrorOf><url>https://<kho-noi-bo>/…</url></mirror>`; Node:
+`-Dfrontend.download.root=<mirror Node>` nếu không ra được nodejs.org.
 
 ```bash
 git clone -b mani/hotpatch https://github.com/danghung0503/boot-ui.git && cd boot-ui
@@ -56,12 +61,22 @@ jar 30 MB thay vì 24 MB). Cần mạng tới Maven Central (hoặc proxy nội 
 
 ## 2. Gắn vào app
 
-Chép jar vào `libs/` của service, thêm **một dòng**:
+Chép jar vào `libs/` của service, thêm **một dòng** (Gradle):
 ```groovy
+// build.gradle (Groovy DSL)
 dependencies {
-    implementation files('libs/bootui-hotpatch-2.2.0-mani.5-lite.jar')     // hoặc bản đầy đủ không có -lite
+    implementation files('libs/bootui-hotpatch-2.2.0-mani.6-lite.jar')     // hoặc bản đầy đủ không có -lite
 }
 ```
+```kotlin
+// build.gradle.kts (Kotlin DSL)
+dependencies {
+    implementation(files("libs/bootui-hotpatch-2.2.0-mani.6-lite.jar"))
+}
+```
+`bootJar` của plugin Spring Boot tự đưa jar vào `BOOT-INF/lib` (đã kiểm với project Gradle). Commit file jar vào repo service
+(hoặc Git LFS) để CI build được. Maven (`pom.xml`): `<scope>system</scope>` không vào fat jar — dùng `mvn install:install-file`
+vào kho nội bộ rồi khai dependency bình thường.
 Không đổi gì khác: Dockerfile chuẩn (JDK build → JRE chạy `app.jar`) giữ nguyên. BootUI **tắt** khi không có
 `BOOTUI_ENABLED=ON` — không nạp agent, `/bootui` trả 404 (đã kiểm).
 
@@ -111,10 +126,20 @@ curl -sk -H "Authorization: Bearer $TOKEN" $H/bootui/api/hotpatch
 #  ⇒ "available":true, "compiler":"javac <version> (bundled)"
 docker run --rm --entrypoint sh <image> -c 'find / -xdev -name "*.java" | wc -l'                    # 0 (không source)
 ```
+Cách đọc classpath theo kiểu chạy (`ApplicationArchive`, `ApplicationClassPath`):
+
+| Kiểu chạy | Class của app | Classpath cho javac |
+|---|---|---|
+| `java -jar app.jar` | `BOOT-INF/classes` trong jar, giải nén ra thư mục tạm | `BOOT-INF/lib` trong jar, giải nén |
+| giải nén + `JarLauncher` | `BOOT-INF/classes/` (URL của class loader) | URL của class loader (`BOOT-INF/lib/*.jar`) |
+| `-Djarmode=tools extract` | trong `app/app.jar` mỏng, giải nén package của app ra thư mục tạm | `Class-Path` trong manifest (`lib/*.jar`) |
+
 Đã kiểm 2026-11-02: app Spring Boot 4.1 (web + actuator + spring-tx + **chỉ** jar này) trên JRE 21 jlink (không `jdk.compiler`,
 không `jdk.attach`): agent tự nạp, `javac 21.0.10+7-LTS (bundled)`, Lombok / record / `switch` / lambda dùng `this` vá + revert
 đúng, 4/4 class vá nguyên trạng; advisor Architecture (ArchUnit đổi package) quét 5 class / 41 rule; tắt `BOOTUI_ENABLED` ⇒ 404,
 không agent. Bản lite: như trên, `/bootui/api/otlp` ⇒ 404, log không thiếu class.
+Ba kiểu chạy (2026-11-03, project **Gradle**, `bootJar` layered, jar `mani.6-lite`): `java -jar`, layered + `JarLauncher`,
+`-Djarmode=tools extract` — mỗi kiểu liệt kê class, dịch ngược, biên dịch, vá + revert đúng, 4/4 class, không lỗi thiếu class.
 
 ## 6. Giới hạn
 

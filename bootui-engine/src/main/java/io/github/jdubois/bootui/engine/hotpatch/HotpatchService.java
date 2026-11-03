@@ -54,6 +54,9 @@ public final class HotpatchService {
     private final ClassLoader loader;
     private final String classPath;
     private final Optional<ApplicationArchive> archive;
+    /** The class path read from the class loader, for an application not run as {@code java -jar app.jar}. */
+    private ApplicationClassPath loaderClassPath;
+
     private final Path lombok;
     private volatile boolean javaBaseOpened;
     /** Patches in effect, by class, oldest first, with the source they were compiled from. */
@@ -121,7 +124,7 @@ public final class HotpatchService {
         TreeSet<String> names = new TreeSet<>();
         List<Path> roots = archive.isPresent()
                 ? List.of(archive.get().classes())
-                : Stream.of(classPath.split(File.pathSeparator)).map(Path::of).toList();
+                : loaderClassPath().classRoots(packages());
         for (Path root : roots) {
             if (!Files.isDirectory(root)) {
                 continue;
@@ -198,7 +201,10 @@ public final class HotpatchService {
         }
     }
 
-    /** The top-level class file on disk: in a class directory, or among the executable jar's extracted classes. */
+    /**
+     * The top-level class file on disk: among the executable jar's extracted classes, next to a class file, or under the
+     * class loader's class roots (an unpacked jar, a thin jar from {@code -Djarmode=tools extract}).
+     */
     private Path outerClassFile(String outer, URI classFile) {
         if (archive.isPresent()) {
             Path extracted = archive.get().classes().resolve(outer.replace('.', '/') + ".class");
@@ -207,14 +213,24 @@ public final class HotpatchService {
         if (classFile != null && "file".equals(classFile.getScheme())) {
             Path path = Path.of(classFile);
             Path top = path.resolveSibling(outer.substring(outer.lastIndexOf('.') + 1) + ".class");
-            return Files.isRegularFile(top) ? top : null;
+            if (Files.isRegularFile(top)) {
+                return top;
+            }
         }
-        return null;
+        return loaderClassPath().classFile(outer, packages());
     }
 
-    /** The running class path, or the executable jar's own classes and libraries. */
+    /** The executable jar's own classes and libraries, else the class path read from the class loader. */
     private String compileClassPath() {
-        return archive.map(ApplicationArchive::classPath).orElse(classPath);
+        return archive.map(ApplicationArchive::classPath)
+                .orElseGet(() -> loaderClassPath().compilerClassPath());
+    }
+
+    private synchronized ApplicationClassPath loaderClassPath() {
+        if (loaderClassPath == null) {
+            loaderClassPath = ApplicationClassPath.of(loader, classPath);
+        }
+        return loaderClassPath;
     }
 
     public HotpatchCompileDto compile(HotpatchRequest request) {
